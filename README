@@ -1,3 +1,14 @@
+ObjectivePerl version 0.03
+==========================
+
+Changes in this version:
+* Added a debug mode with flags to allow debugging
+  of messaging and/or source filtering
+* Added CamelBones compatibility
+* Added return types and argument types (optional, but required
+  for CamelBones compatibility)
+* Fixed many parsing and messaging bugs
+
 ObjectivePerl version 0.01
 ==========================
 

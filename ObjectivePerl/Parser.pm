@@ -128,6 +128,7 @@ sub parse {
 	$self->parseMethodsForInstanceVariables();
 	$self->extractMessages();
 	$self->translateMessages();
+	$self->postProcess();
 #$self->dump();
 }
 
@@ -201,23 +202,44 @@ sub parseMethodDefinitions {
 		if ($contentElement =~ /^package ([A-Za-z0-9_:]+);/m) {
 			$self->{_currentClass} = $1;
 		}
-		while ($contentElement =~ /^([\+\-]) ([a-zA-Z0-9_]+[^\{]*{)/m) {
+		while ($contentElement =~ /^(([\+\-])\s*(\([a-zA-Z]+\))?\s*([a-zA-Z0-9_]+[^\{]*{))/m) {
 			my $methodType = "INSTANCE";
-			my $methodLine = quotemeta("$1 $2");
-			my $methodDeclaration = $2;
-			if ($1 eq "+") {
+			my $methodLine = quotemeta("$1");
+			my $methodDeclaration = $4;
+			my $returnType = $3;
+			if ($2 eq "+") {
 				$methodType = "STATIC";
 			}
 
 			my $newMethodDefinition = methodDefinitionFromMethodTypeAndDeclaration(
 										$methodType, $methodDeclaration);
+			if ($returnType) {
+				$returnType =~ s/[()]//g;
+				$newMethodDefinition->{returnType} = $returnType;
+			}
 			if ($self->{_classes}->{$self->{_currentClass}}->{methods}->{$newMethodDefinition->{signature}}) {
 				#IF::Log::dump($self->{_classes}->{$self->{_currentClass}}->{methods});
 				croak("Warning, redefinition of method shown here: ".$newMethodDefinition->{signature}." in class ".$self->{_currentClass});
 			}
 			$self->{_classes}->{$self->{_currentClass}}->{methods}->{$newMethodDefinition->{signature}} = $newMethodDefinition;
-			
-			my $newMethodLine = "sub ".$newMethodDefinition->{signature}." {\n";
+			my $methodSignature = $newMethodDefinition->{signature};
+			if ($self->camelBonesCompatibility()) {
+				my $selector = $newMethodDefinition->{signature};
+				$selector =~ s/_/:/g;
+				$selector .= ":"; #??
+				$methodSignature .= " : Selector($selector)";
+				if ($newMethodDefinition->{argumentTypes}) {
+					my $argumentList = "";
+					foreach my $argumentType (@{$newMethodDefinition->{argumentTypes}}) {
+						$argumentList .= argumentTypeCharacterFromArgumentTypeName($argumentType);
+					}
+					$methodSignature .= " ArgTypes($argumentList)";
+				}
+				if ($newMethodDefinition->{returnType}) {
+					$methodSignature .= " ReturnType(".argumentTypeCharacterFromArgumentTypeName($newMethodDefinition->{returnType}).")";
+				}
+			}
+			my $newMethodLine = "sub ".$methodSignature." {\n";
 			$newMethodLine .= "\tmy (".join(", ", '$objp_self', @{$newMethodDefinition->{arguments}}).") = \@_;\n";
 			if ($newMethodDefinition->{type} eq "INSTANCE") {
 				$newMethodLine .= "\tmy \$self = \$objp_self;\n";
@@ -243,13 +265,14 @@ sub parseMethodsForInstanceVariables {
 		}
 
 		foreach my $methodName (@$foundMethods) {
+#print $methodName."\n";
 			my $methodDefinition = $self->{_classes}->{$self->{_currentClass}}->{methods}->{$methodName};
 			my $isInstanceMethod;
 			if ($methodDefinition) {
 				#IF::Log::dump($methodDefinition);
 				$isInstanceMethod = ($methodDefinition->{type} eq "INSTANCE");
 			}
-			my ($beforeSub, $afterSub) = split(/^sub $methodName\s+/sm, $contentElement, 2);
+			my ($beforeSub, $afterSub) = split(/^sub $methodName.?[^\{]*/sm, $contentElement, 2);
 			my @stuff = extract_codeblock($afterSub, '{}');
 			my $methodBlock = $stuff[0];
 			
@@ -308,6 +331,8 @@ sub parseMethodsForInstanceVariables {
 			
 				$methodBlock =~ s/^#OPIV/$ivarImports/gsm;
 				$contentElement =~ s/$originalCode/$methodBlock/;
+			} else {
+				print "Couldn't extract method block for $methodName\n";
 			}
 		}
 	}
@@ -319,7 +344,6 @@ sub translateMessages {
 	foreach my $contentElement (@$content) {
 		next unless ref $contentElement eq 'ARRAY';
 		$contentElement = messageInvocationForContentElements($contentElement);
-		#IF::Log::debug($contentElement);
 	}
 }
 
@@ -431,6 +455,26 @@ sub dump {
 	}
 }
 
+sub debug {
+	my $self = shift;
+	return $self->{_debug};
+}
+
+sub setDebug {
+	my $self = shift;
+	$self->{_debug} = shift;
+}
+
+sub camelBonesCompatibility {
+	my $self = shift;
+	return $self->{_camelBonesCompatibility};
+}
+
+sub setCamelBonesCompatibility {
+	my $self = shift;
+	$self->{_camelBonesCompatibility} = shift;
+}
+
 # static methods:
 
 sub splitSourceOnMessageEnd {
@@ -490,7 +534,8 @@ sub methodDefinitionFromMethodTypeAndDeclaration {
 	my $declarationParts = [];
 	my $arguments = [];
 	my $methodDefinition = { type => $type };
-
+	my $argumentTypes = [];
+	
 	while ($declaration =~ /^([a-zA-Z0-9_]*)(:|\s|$)/) {
 		my $part = $1;
 		my $end = $2;
@@ -499,13 +544,21 @@ sub methodDefinitionFromMethodTypeAndDeclaration {
 		$declaration =~ s/^[a-zA-Z0-9_]*:?\s*//g;
 		last unless ($end eq ":");
 
+		if ($declaration =~ /^\s*\(([^)]+)\)/) {
+			push (@$argumentTypes, $1);
+			$declaration =~ s/^\s*\([^)]+\)\s*//g;
+		} else {
+			push (@$argumentTypes, "id");
+		}
+
 		$declaration =~ s/^\s*(\$[a-zA-Z0-9_]+)\s*//g;
 		push (@$arguments, $1);
 	}
 
-	$methodDefinition->{selectors} = $declarationParts;
-	$methodDefinition->{arguments} = $arguments;
-	$methodDefinition->{signature} = join("_", @$declarationParts);
+	$methodDefinition->{selectors}     = $declarationParts;
+	$methodDefinition->{arguments}     = $arguments;
+	$methodDefinition->{argumentTypes} = $argumentTypes;
+	$methodDefinition->{signature}     = join("_", @$declarationParts);
 	return $methodDefinition;
 }
 
@@ -535,6 +588,25 @@ sub classDefinitionFromClassAndParentClassConformingToProtocols {
 	push (@isa, "ObjectivePerl::Object");
 	$definition .= "\@ISA = qw(".join(" ", @isa).");\n\n";
 	return $definition;
+}
+
+sub postProcess {
+	my $self = shift;
+	if ($self->debug() & $ObjectivePerl::DEBUG_SOURCE) {
+		my $isDumping = 0;
+		my @lines = split(/\n/, join("", @{$self->content()}));
+		my $lineNumber = 1;
+		foreach my $line (@lines) {
+			if ($line =~ /OBJP_DEBUG_START/) {
+				$isDumping = 1;
+			}
+			if ($line =~ /OBJP_DEBUG_END/) {
+				$isDumping= 0;
+			}
+			print STDOUT sprintf("%04d: %s\n", $lineNumber, $line) if $isDumping;
+			$lineNumber++;
+		}
+	}
 }
 
 sub instanceVariablesFromInstanceDeclarations {
@@ -634,6 +706,15 @@ sub unbalanced {
 		return $char if ($char =~ /[\[\{\(]/ && $balanced->{$char} != 0);
 		return $char if ($char =~ /["']/ && $balanced->{$char} % 2 != 0);
 	}
+}
+
+sub argumentTypeCharacterFromArgumentTypeName {
+	my $typeName = shift;
+	return "@" if $typeName eq "id";
+	return "v" if $typeName eq "void";
+	return "i" if $typeName eq "int";
+	return "c" if $typeName eq "char";
+	return $typeName;
 }
 
 1;

@@ -5,16 +5,13 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 33;
-use ObjectivePerl;
+use Test::More tests => 35;
+use ObjectivePerl debug => 1;
 
 ok(1); # If we made it this far, we're ok.
 
 #########################
-
-# Insert your test code below, the Test::More module is use()ed here so read
-# its man page ( perldoc Test::More ) for help writing this test script.
-
+# OBJP_DEBUG_START
 # Empty class definition:
 @implementation TestClass
 @end
@@ -123,10 +120,10 @@ ok(~[$opInstance protected] eq "TEST", "Set and get using methods of inherited i
 
 $opInstance = ~[~[Inheritor2 new] init];
 ok($opInstance, "Instantiated sub-sub-class in obj-p");
-ok(~[$opInstance protected] eq "Protected", "Initialised grandparent's protected value using parent's methods");
-ok(~[$opInstance secondProtected] eq "Second protected", "Initialised parent's protected value using own methods");
+ok(~[$opInstance protected] || "" eq "Protected", "Initialised grandparent's protected value using parent's methods");
+ok(~[$opInstance secondProtected] || "" eq "Second protected", "Initialised parent's protected value using own methods");
 ~[$opInstance setProtected: "P" andSecondProtected: "2P"];
-ok(~[$opInstance protected] eq "P" && ~[$opInstance secondProtected] eq "2P", "Initialised both values using one method with multiple args");
+ok(~[$opInstance protected] || "" eq "P" && ~[$opInstance secondProtected] eq "2P", "Initialised both values using one method with multiple args");
 
 @implementation MethodSignatureTest
 - testSimpleSignature {
@@ -162,21 +159,24 @@ ok(1, "Parsed mixed method definitions without yacking");
 $opInstance = ~[MethodSignatureTest new];
 ok($opInstance, "Instantiated method signature test object");
 ok(~[$opInstance testSimpleSignature], "Tested simple signature");
-ok(~[$opInstance testSignatureWithArgument: "argument"], "Tested  signature with one argument");
+ok(~[$opInstance testSignatureWithArgument: "argument"], "Tested signature with one argument");
 ok(~[$opInstance testSignatureWithMultipleArguments:"argument" :"another"], "Tested signature with multiple arguments");
 ok(~[$opInstance testOldStyleMethodWithArgument:"argument" andArgument:"another"], "Tested old-style signature with multiple arguments");
 ok(~[$opInstance testOldStyleMethodWithArgument:"argument"], "Tested old-style signature with single argument and underscore");
 ok(~[$opInstance testMethodWithTwoUnderscores:"argument" :"argument"], "Tested old-style signature with two underscores");
 
+#no ObjectivePerl;
+#ok(1, "no ObjectivePerl;");
+#use ObjectivePerl CamelBones => 1;
+#ok(1, "CamelBones compatibility mode");
 
+@implementation CamelBonesTest
+- (IBAction) outletOfSomeKind:$sender {
+	return $sender;
+}
+@end
 
+my $cbp = ~[~[CamelBonesTest new] init];
 
-
-#sub ok {
-#	my ($condition, $message) = @_;
-#	if ($condition) {
-#		print "$message\n";
-#	} else {
-#		print "FAILED: $message\n";
-#	}
-#};
+ok($cbp, "CamelBones object instantiated");
+ok(~[$cbp outletOfSomeKind:"Hey sucka"] eq "Hey sucka", "Correctly parsed method with return type");

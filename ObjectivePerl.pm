@@ -10,12 +10,19 @@ package ObjectivePerl;
 
 use strict;
 use warnings;
+use vars qw($DEBUG_SOURCE $DEBUG_MESSAGING $DEBUG_ALL);
 use Filter::Simple;
 use ObjectivePerl::Runtime;
 use ObjectivePerl::Parser;
 use ObjectivePerl::InstanceVariable;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
+
+# debug levels; these are a bitmask
+# so you can combine more than one using the | operator
+$DEBUG_SOURCE    = 0x0001;
+$DEBUG_MESSAGING = 0x0002;
+$DEBUG_ALL       = 0xffff;
 
 my $parser = ObjectivePerl::Parser->new();
 
@@ -32,6 +39,15 @@ sub import {
 		if ($key eq "class") {
 			$parser->{_currentClass} = $value;
 			next;
+		}
+		if ($key eq "debug") {
+			my $debugLevel = $value || $DEBUG_ALL;
+			$parser->setDebug($debugLevel);
+			ObjectivePerl::Runtime->runtime()->setDebug($debugLevel);
+		}
+		if ($key eq "CamelBones" && $value) {
+			$parser->setCamelBonesCompatibility(1);
+			ObjectivePerl::Runtime->runtime()->setCamelBonesCompatibility(1); #needed?
 		}
 		# TODO: allow user to change start/end regexps, etc.
 	}
@@ -74,7 +90,6 @@ then, from a calling script or class:
   my $instance = ~[MyClass new];
   ~[$instance setSomeInstanceVariable: "Hey you!"];
   print ~[$instance someInstanceVariable]."\n";
-
 
 =head1 DESCRIPTION
 
@@ -215,6 +230,25 @@ ObjectivePerl runtime... it has to be invoked right from within your
 method.  It may be possible with some judicious 'eval()'-ing but
 right now I can't be bothered.
 
+New in Version 0.03: CamelBones compatibility.  This is important,
+and mentioned in this section because in order to respond to
+messages from the Cocoa runtime, you need to be a bit stricter in
+your method definitions.  To turn on CamelBones compatibility,
+you say
+
+   use ObjectivePerl CamelBones => 1;
+
+and then, for methods (delegate or data source methods, for example)
+you need to use Obj-C style types:
+
+   - (id)initWithPath:(id)$path parent:(id)$obj {
+      ...
+   }
+
+The method signature is translated into CamelBones-style signatures
+for you.
+
+
 =head2 Class Hierarchy
 
 In general, ObjectivePerl doesn't mess with the class hierarchy.
@@ -338,6 +372,39 @@ cascade that works as follows:
        and selector array as arguments.
 
 
+=head2 DEBUGGING
+
+Right now one of the trickiest things is debugging the ObjectivePerl
+code, because the line numbers reported by the perl runtime correspond
+to the translated line numbers, not the line numbers in your source.
+Moreover, the messaging runtime is a bit obtuse, so it's often very nice
+to be able to see a trace of messages being passed.  To make both of
+these debugging problems a bit easier, I've added a "debug" option...
+
+   use ObjectivePerl debug => MASK;
+
+where MASK is made up of:
+
+	$DEBUG_SOURCE    = 0x0001;
+	$DEBUG_MESSAGING = 0x0002;
+	$DEBUG_ALL       = 0xffff;
+
+so to turn on message and source debugging, use
+
+	use ObjectivePerl debug => 0x0003;
+
+and so on.  If you turn on message debugging, you'll see all the messages
+fly by as they're sent.
+
+To use "source" debugging, wrap your source with these:
+
+   #OBJP_DEBUG_START
+   ...
+   #OBJP_DEBUG_END
+
+and when it's translated, the translated source will be dumped out for you.
+Yeah, it's a nasty kludge.  A better solution awaits.
+
 =head1 BUGS
 
 Dang, there have to be bugs...  as of this release,
@@ -388,11 +455,17 @@ but this isn't:
 
 because I don't know enough about regexes...
 
+Also, comments don't work properly.  Sorry.  If you comment out
+some lines of your ObjectivePerl, it might yack.  Fix forthcoming.
+
 Saving the best bug for last; it's really hard to get useful
 feedback on errors in your code, because the rewritten
 code has wildly different line numbers from your code.  I
 will work on smoothing this difference out as much as possible...
 and if anyone has ideas on how to improve it, please let me know.
+(Post script to this; with version 0.03, we now have the
+debug mode that at least can dump out the resulting code
+making it easier to find nasty errors)
 
 =head1 TO-DO
 
@@ -419,6 +492,8 @@ Still to be done, other than fixing the aforementioned bugs:
     don't need it but I'll add it if anyone ever wants it.
     Of course, in order for that to happen, someone might actually
     have to use this...
+
+  * Fix the commenting issue
 
 =head1 SEE ALSO
 

@@ -8,6 +8,7 @@
 
 package ObjectivePerl::Runtime;
 use strict;
+use Data::Dumper;
 
 my $_runtime; # we will use a singleton runtime to track classes etc.
 
@@ -24,43 +25,78 @@ sub init {
 	my $self = shift;
 }
 
+sub debug {
+	my $self = shift;
+	return $self->{_debug};
+}
+
+sub setDebug {
+	my $self = shift;
+	$self->{_debug} = shift;
+}
+
+sub camelBonesCompatibility {
+	my $self = shift;
+	return $self->{_camelBonesCompatibility};
+}
+
+sub setCamelBonesCompatibility {
+	my $self = shift;
+	$self->{_camelBonesCompatibility} = shift;
+}
+
 sub ObjpMsgSend {
 	my $className = shift;
-	$className->runtime()->objp_msgSend(@_);
+	# For some reason, CamelBones yacks if you don't assign the return
+	# value to a variable at some point (maybe can't fish things off the stack?)
+	# so we would have to do this even without the debug line
+	my $returnValue = $className->runtime()->objp_msgSend(@_);
+	if ($className->runtime()->debug() & $ObjectivePerl::DEBUG_MESSAGING) {
+		print "Return value: ".Data::Dumper->Dump([$returnValue], [qw($value)])."\n";
+	}
+	return $returnValue;
 }
 
 sub objp_msgSend {
 	my $self = shift;
-	my $receiver = shift;
-	my $message = shift;
-	my $selectors = shift; # an array of key value pairs
+	my $receiver = shift || "";
+	my $message = shift || "";
+	my $selectors = shift || []; # an array of key value pairs
 
-	return unless $receiver;
-	return unless $message;
+	if ($self->debug() & $ObjectivePerl::DEBUG_MESSAGING) { print "Trying to invoke $message on $receiver\n" };
+	return undef unless $receiver;
+	return undef unless $message;
 	# the first argument is the entry for $message
-	my $messageSignature = messageSignatureFromMessageAndSelectors($message, $selectors);
+	my $messageSignature = messageSignatureFromMessageAndSelectors($message, $selectors) || "";
+
 	my $argumentList = [];
 	foreach my $selector (@$selectors) {
 		push (@$argumentList, $selector->{value});
 	}
-
+	
 	# send the message
-	if ($receiver->can($messageSignature)) {
+	if (UNIVERSAL::can($receiver, $messageSignature)) {
+		if ($self->debug() & $ObjectivePerl::DEBUG_MESSAGING) { print "Invoking $messageSignature on object $receiver\n"; }
 		return $receiver->$messageSignature(@$argumentList);
 	} else {
-		my $messageSignatureWithNoUnderscores = lcfirst(join("", map {ucfirst($_)} split(/_/, $messageSignature)));
-#print "Trying to invoke $messageSignatureWithNoUnderscores\n";
-		if ($receiver->can($messageSignatureWithNoUnderscores)) {
+		my $messageSignatureWithNoUnderscores = lcfirst(join("", map {ucfirst($_)} split(/_/, $messageSignature)));		
+		if (UNIVERSAL::can($receiver, $messageSignatureWithNoUnderscores)) {
+			if ($self->debug() & $ObjectivePerl::DEBUG_MESSAGING) { print "Invoking $messageSignatureWithNoUnderscores on object $receiver\n"; }
 			return $receiver->$messageSignatureWithNoUnderscores(@$argumentList);
 		}
 		my $messageSignatureWithTrailingUnderscores = $messageSignatureWithNoUnderscores.("_" x scalar(@$argumentList));
-#print "Trying to invoke $messageSignatureWithTrailingUnderscores\n";
-		if ($receiver->can($messageSignatureWithTrailingUnderscores)) {
+		if (UNIVERSAL::can($receiver, $messageSignatureWithTrailingUnderscores)) {
+			if ($self->debug() & $ObjectivePerl::DEBUG_MESSAGING) { print "Invoking $messageSignatureWithTrailingUnderscores on object $receiver\n"; }
 			return $receiver->$messageSignatureWithTrailingUnderscores(@$argumentList);
 		}
 	}
-	if ($receiver->can("handleUnknownSelector")) {
+	# TODO: Handle unknown static methods... this will only work with instance methods
+	if (UNIVERSAL::can($receiver, "handleUnknownSelector")) {
+		if ($self->debug() & $ObjectivePerl::DEBUG_MESSAGING) { print "Invoking handleUnknownSelector on object $receiver\n"; }
 		return $receiver->handleUnknownSelector($message, $selectors);
+	} else {
+		# can't find the method anywhere, so just send it to the object and see what happens
+		return $receiver->$messageSignature(@$argumentList);
 	}
 	return undef;
 }
