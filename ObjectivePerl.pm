@@ -15,9 +15,8 @@ use ObjectivePerl::Runtime;
 use ObjectivePerl::Parser;
 use ObjectivePerl::InstanceVariable;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
-# Preloaded methods go here.
 my $parser = ObjectivePerl::Parser->new();
 
 FILTER {
@@ -56,7 +55,7 @@ ObjectivePerl - Objective-C style syntax and runtime for perl
   }
 
   + new {
-  	~[$super new];
+  	return ~[$super new];
   }
 
   - setSomeInstanceVariable: $value {
@@ -68,8 +67,10 @@ ObjectivePerl - Objective-C style syntax and runtime for perl
   }
   @end
 
-  you can then do
-  
+then, from a calling script or class:
+
+  use ObjectivePerl;
+  ...
   my $instance = ~[MyClass new];
   ~[$instance setSomeInstanceVariable: "Hey you!"];
   print ~[$instance someInstanceVariable]."\n";
@@ -307,6 +308,36 @@ some perl to import those into the method.  After that, perl
 returns control to the newly rewritten program and if all goes well,
 your code will be executing.
 
+=head2 Message Dispatch
+
+If you define methods using the -/+ syntax, ObjectivePerl will
+translate those method definitions into regular perl subs with
+names based on the method name and its arguments.  You can then
+invoke those methods using obj-c style messages.  However,
+there are often times when you need to call older perl code that
+does not list its arguments in its signature, or perhaps you wish
+to invoke a method across the PerlObjCBridge in OSX.  To do
+this transparently, the ObjectivePerl runtime uses a method lookup
+cascade that works as follows:
+
+    1. It tries to find the correctly-defined method
+       for the invocation using ObjectivePerl syntax
+    2. It tries to find a method whose name corresponds to the
+       message name and its argument list, so for this invocation:
+
+      ~[$myObject appendToResponse:$response inContext:$context];
+
+       it will try to find a perl sub called "appendToResponseInContext".
+    3. It will try to find a method with the same name
+       as step 2 but with a single underscore appended for each
+       argument (so in the case of the example, it will search
+       for "appendToResponseInContext__").
+    4. Failing all of these, it checks if the receiver of the
+       message has a method called "handleUnknownSelector", and
+       if it does, it invokes that method with the message name
+       and selector array as arguments.
+
+
 =head1 BUGS
 
 Dang, there have to be bugs...  as of this release,
@@ -377,18 +408,29 @@ Still to be done, other than fixing the aforementioned bugs:
     parsing ObjectivePerl syntax, and to change the look
     of @implementation into something more perl-ish.
 
+  * Protocols are implemented right now in syntax only; it
+    should work ok, but the parser does not force your
+    class to implement that protocol, so it's an "informal"
+    protocol, not a "formal" one (yet).
+
   * Since instance variables can only be scalars, the possibility
-	of enhancing the system to use other types (arrays,
+    of enhancing the system to use other types (arrays,
     hashes, filehandles, typeglobs...) is there.  I personally
     don't need it but I'll add it if anyone ever wants it.
     Of course, in order for that to happen, someone might actually
-    have to B<use> this...
+    have to use this...
 
 =head1 SEE ALSO
 
-* Any documentation on obj-c or its runtime to learn about the
-  terminology and syntax.
-* The documentation on Filter::Simple
+    * Any documentation on obj-c or its runtime to learn about the
+      terminology and syntax.
+    * The documentation on Filter::Simple
+    * The Apple website on obj-c:
+       http://developer.apple.com/documentation/Cocoa/Conceptual/ObjectiveC/
+    * The best book, from the source of obj-c:
+	  Cox, Brad J. and Andrew J. Novobilski "Object-Oriented
+                 Programming: An Evolutionary Approach",
+                 Addison-Wesley, 1991.
 
 =head1 AUTHOR
 

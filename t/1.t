@@ -5,8 +5,9 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 25;
+use Test::More tests => 33;
 use ObjectivePerl;
+
 ok(1); # If we made it this far, we're ok.
 
 #########################
@@ -126,3 +127,56 @@ ok(~[$opInstance protected] eq "Protected", "Initialised grandparent's protected
 ok(~[$opInstance secondProtected] eq "Second protected", "Initialised parent's protected value using own methods");
 ~[$opInstance setProtected: "P" andSecondProtected: "2P"];
 ok(~[$opInstance protected] eq "P" && ~[$opInstance secondProtected] eq "2P", "Initialised both values using one method with multiple args");
+
+@implementation MethodSignatureTest
+- testSimpleSignature {
+	return 1;
+}
+
+- testSignatureWithArgument: $argument {
+	return ($argument ne "");
+}
+
+- testSignatureWithMultipleArguments: $first : $second {
+	return ($first ne "" && $second ne "");
+}
+
+sub testOldStyleMethodWithArgumentAndArgument {
+	my ($self, $first, $second) = @_;
+	return ($first ne "" && $second ne "");
+}
+
+sub testOldStyleMethodWithArgument_ {
+	my ($self, $argument) = @_;
+	return ($argument ne "");
+}
+
+sub testMethodWithTwoUnderscores__ {
+	my ($self, $first, $second) = @_;
+	return ($first ne "" && $second ne "");
+}
+
+@end
+
+ok(1, "Parsed mixed method definitions without yacking");
+$opInstance = ~[MethodSignatureTest new];
+ok($opInstance, "Instantiated method signature test object");
+ok(~[$opInstance testSimpleSignature], "Tested simple signature");
+ok(~[$opInstance testSignatureWithArgument: "argument"], "Tested  signature with one argument");
+ok(~[$opInstance testSignatureWithMultipleArguments:"argument" :"another"], "Tested signature with multiple arguments");
+ok(~[$opInstance testOldStyleMethodWithArgument:"argument" andArgument:"another"], "Tested old-style signature with multiple arguments");
+ok(~[$opInstance testOldStyleMethodWithArgument:"argument"], "Tested old-style signature with single argument and underscore");
+ok(~[$opInstance testMethodWithTwoUnderscores:"argument" :"argument"], "Tested old-style signature with two underscores");
+
+
+
+
+
+#sub ok {
+#	my ($condition, $message) = @_;
+#	if ($condition) {
+#		print "$message\n";
+#	} else {
+#		print "FAILED: $message\n";
+#	}
+#};

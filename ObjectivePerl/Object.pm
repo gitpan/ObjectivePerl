@@ -14,6 +14,7 @@ sub new {
 sub init { return $_[0] }
 sub handleUnknownSelector {
 	my ($self, $message, $selectors) = @_;
+	return undef;
 }
 1;
 __END__

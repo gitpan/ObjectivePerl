@@ -326,7 +326,6 @@ sub translateMessages {
 sub messageInvocationForContentElements {
 	my $contentElements = shift;
 
-	# build the whole string
 	my $message;
 	foreach my $contentElement (@$contentElements) {
 		if (ref $contentElement eq 'ARRAY') {
@@ -358,6 +357,9 @@ sub messageInvocationForContentElements {
 			my $quotedSelector = quotemeta($selector);
 			$message =~ s/$quotedSelector[:]\s*//;
 			my $argument = extractDelimitedChunkTerminatedBy($message, " ");
+			if ($selector eq "") {
+				$selector = "_";
+			}
 			push (@$selectors, { key => "$selector", value => $argument });
 			my $quotedArgument = quotemeta($argument);
 			$message =~ s/$quotedArgument\s*//;
@@ -388,7 +390,7 @@ sub messageInvocationForContentElements {
 
 sub quoteIfNecessary {
 	my $string = shift;
-	if ($string =~ /^[A-Za-z0-9_]+$/) {
+	if ($string =~ /^[A-Za-z0-9_i:]+$/) {
 		$string = '"'.$string.'"';
 	}
 	return $string;
@@ -565,7 +567,7 @@ sub instanceVariablesFromInstanceDeclarations {
 sub extractDelimitedChunkTerminatedBy {
 	my $chunk = shift;
 	my $terminator = shift;
-	my $extracted;
+	my $extracted = "";
 	my $balanced = {};
 	my $isQuoting = 0;
 	my $outerQuoteChar = '';

@@ -47,7 +47,19 @@ sub objp_msgSend {
 	# send the message
 	if ($receiver->can($messageSignature)) {
 		return $receiver->$messageSignature(@$argumentList);
-	} elsif ($receiver->can("handleUnknownSelector")) {
+	} else {
+		my $messageSignatureWithNoUnderscores = lcfirst(join("", map {ucfirst($_)} split(/_/, $messageSignature)));
+#print "Trying to invoke $messageSignatureWithNoUnderscores\n";
+		if ($receiver->can($messageSignatureWithNoUnderscores)) {
+			return $receiver->$messageSignatureWithNoUnderscores(@$argumentList);
+		}
+		my $messageSignatureWithTrailingUnderscores = $messageSignatureWithNoUnderscores.("_" x scalar(@$argumentList));
+#print "Trying to invoke $messageSignatureWithTrailingUnderscores\n";
+		if ($receiver->can($messageSignatureWithTrailingUnderscores)) {
+			return $receiver->$messageSignatureWithTrailingUnderscores(@$argumentList);
+		}
+	}
+	if ($receiver->can("handleUnknownSelector")) {
 		return $receiver->handleUnknownSelector($message, $selectors);
 	}
 	return undef;
@@ -60,7 +72,11 @@ sub messageSignatureFromMessageAndSelectors {
 	if ($arguments) {
 		foreach my $argument (@$arguments) {
 			next if ($argument->{key} eq $message);
-			$messageSignature .= "_".$argument->{key};
+			if ($argument->{key} eq "_") {
+				$messageSignature .= "_";
+			} else {
+				$messageSignature .= "_".$argument->{key};
+			}
 		}
 	}
 	return $messageSignature;

@@ -2,6 +2,7 @@ Changes
 Makefile.PL
 MANIFEST
 DISCLAIMER
+CHANGELOG
 ObjectivePerl.pm
 ObjectivePerl/InstanceVariable.pm
 ObjectivePerl/Object.pm
