@@ -16,7 +16,7 @@ use ObjectivePerl::Runtime;
 use ObjectivePerl::Parser;
 use ObjectivePerl::InstanceVariable;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 # debug levels; these are a bitmask
 # so you can combine more than one using the | operator
@@ -356,17 +356,25 @@ cascade that works as follows:
 
     1. It tries to find the correctly-defined method
        for the invocation using ObjectivePerl syntax
-    2. It tries to find a method whose name corresponds to the
+    2. (NEW in 0.03 for CamelBones Compatibility) 
+       It tries to find a method whose name corresponds
+       to the message name and its argument list, separated
+       by underscores, so for this invocation:
+
+       ~[$myObject appendToResponse:$response inContext:$context];
+
+	   it will try to find a perl sub called "appendToResponse_inContext".
+    3. It tries to find a method whose name corresponds to the
        message name and its argument list, so for this invocation:
 
       ~[$myObject appendToResponse:$response inContext:$context];
 
        it will try to find a perl sub called "appendToResponseInContext".
-    3. It will try to find a method with the same name
+    4. It will try to find a method with the same name
        as step 2 but with a single underscore appended for each
        argument (so in the case of the example, it will search
        for "appendToResponseInContext__").
-    4. Failing all of these, it checks if the receiver of the
+    5. Failing all of these, it checks if the receiver of the
        message has a method called "handleUnknownSelector", and
        if it does, it invokes that method with the message name
        and selector array as arguments.
@@ -455,9 +463,6 @@ but this isn't:
 
 because I don't know enough about regexes...
 
-Also, comments don't work properly.  Sorry.  If you comment out
-some lines of your ObjectivePerl, it might yack.  Fix forthcoming.
-
 Saving the best bug for last; it's really hard to get useful
 feedback on errors in your code, because the rewritten
 code has wildly different line numbers from your code.  I
@@ -492,8 +497,6 @@ Still to be done, other than fixing the aforementioned bugs:
     don't need it but I'll add it if anyone ever wants it.
     Of course, in order for that to happen, someone might actually
     have to use this...
-
-  * Fix the commenting issue
 
 =head1 SEE ALSO
 

@@ -5,7 +5,7 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 35;
+use Test::More tests => 36;
 use ObjectivePerl debug => 1;
 
 ok(1); # If we made it this far, we're ok.
@@ -180,3 +180,7 @@ my $cbp = ~[~[CamelBonesTest new] init];
 
 ok($cbp, "CamelBones object instantiated");
 ok(~[$cbp outletOfSomeKind:"Hey sucka"] eq "Hey sucka", "Correctly parsed method with return type");
+
+# test the comment filtering:
+# my $object = ~[Inheritor2 new] init];
+ok(1);

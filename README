@@ -1,7 +1,12 @@
-ObjectivePerl version 0.03
+ObjectivePerl version 0.04
 ==========================
+Changes in version 0.04:
+* Fixed the commenting-out bug
+* Fixed the docs to explain message-passing
+  correctly (since the new CamelBones compatibility
+  mode added a new message-signature test)
 
-Changes in this version:
+Changes in version 0.03:
 * Added a debug mode with flags to allow debugging
   of messaging and/or source filtering
 * Added CamelBones compatibility

@@ -117,6 +117,7 @@ sub shouldSuspendParsing {
 
 sub parse {
 	my $self = shift;
+	$self->stripComments();
 	$self->setContent([$self->source()]);
 	$self->parseImplementationDetails();
 	if ($self->shouldSuspendParsing()) {
@@ -129,7 +130,16 @@ sub parse {
 	$self->extractMessages();
 	$self->translateMessages();
 	$self->postProcess();
-#$self->dump();
+	#$self->dump();
+}
+
+sub stripComments {
+	my $self = shift;
+	my $source = $self->source();
+	$source =~ s/^\#OBJP/\!!OBJP/go;
+	$source =~ s/^\s*\#.*$//go;
+	$source =~ s/^!!OBJP/#OBJP/go;
+	$self->setSource($source);
 }
 
 sub breakIntoPackages {
@@ -138,9 +148,9 @@ sub breakIntoPackages {
 	my $splitContent = [];
 	foreach my $contentElement (@$content) {
 		while (1) {
-			if ($contentElement =~ /^\s*(package\s+[A-Za-z0-9_:]+\s*;)/m) {
+			if ($contentElement =~ /^\s*(package\s+[A-Za-z0-9_:]+\s*;)/mo) {
 				my $packageDeclaration = $1;
-				$packageDeclaration =~ /package\s+([A-Za-z0-9_:]+)/;
+				$packageDeclaration =~ /package\s+([A-Za-z0-9_:]+)/o;
 				my $packageName = $1;
 				unless ($self->{_classes}->{$packageName}) {
 					$self->{_classes}->{$packageName} = { methods => {} };
@@ -202,7 +212,7 @@ sub parseMethodDefinitions {
 		if ($contentElement =~ /^package ([A-Za-z0-9_:]+);/m) {
 			$self->{_currentClass} = $1;
 		}
-		while ($contentElement =~ /^(([\+\-])\s*(\([a-zA-Z]+\))?\s*([a-zA-Z0-9_]+[^\{]*{))/m) {
+		while ($contentElement =~ /^(([\+\-])\s*(\([a-zA-Z]+\))?\s*([a-zA-Z0-9_]+[^\{]*{))/mo) {
 			my $methodType = "INSTANCE";
 			my $methodLine = quotemeta("$1");
 			my $methodDeclaration = $4;
@@ -256,7 +266,7 @@ sub parseMethodsForInstanceVariables {
 	my $self = shift;
 	foreach my $contentElement (@{$self->content()}) {
 		next if (ref $contentElement eq 'ARRAY');
-		if ($contentElement =~ /^package ([A-Za-z0-9_:]+);/m) {
+		if ($contentElement =~ /^package ([A-Za-z0-9_:]+);/mo) {
 			$self->{_currentClass} = $1;
 		}
 		my $foundMethods = [];
